@@ -9,11 +9,36 @@ from sqlalchemy import select
 from fastapi.security import OAuth2PasswordRequestForm
 from security import create_refresh_token, get_user_from_refresh_token, oauth2_scheme
 from security import required_role
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from fastapi import Request
+from fastapi.middleware.cors import CORSMiddleware
+
 
 dbSession = Annotated[Session, Depends(get_db)]
 current_user= Annotated[User, Depends(get_current_user)]
 
 app= FastAPI()
+
+limiter= Limiter(key_func= get_remote_address)
+app.state.limit= limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler
+)
+app.middleware(SlowAPIMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins= ["http://127.0.0.1:8000"],
+    allow_credentials= True,
+    allow_methods= ["*"],
+    allow_headers=["*"]
+)
+
+
 
 @app.post("/register", response_model= UserResponse)
 def register(
@@ -44,9 +69,11 @@ def register(
     return new_user
 
 @app.post("/login")
+@limiter.limit("5/minute")
 def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: dbSession
+    db: dbSession,
+    request: Request
 ):
     stmt= select(User).where(
         User.username== form_data.username
