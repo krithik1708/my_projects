@@ -8,13 +8,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from typing import Annotated
 import jwt
-import os
-from dotenv import load_dotenv
-load_dotenv()
+
+from config import secret_key, enviroment, url
+
 
 oauth2_scheme= OAuth2PasswordBearer(tokenUrl= "login")
 
-secret_key= os.getenv("secret_key")
+
 algorithm= "HS256"
 
 password_hash= PasswordHash.recommended()

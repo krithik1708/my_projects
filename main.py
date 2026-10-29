@@ -39,6 +39,43 @@ app.add_middleware(
 )
 
 
+from fastapi.responses import JSONResponse
+
+class UserNotFoundError(Exception):
+    pass
+
+@app.exception_handler(UserNotFoundError)
+def UserNotFound_exception_handler(
+    request: Request,
+    exc: UserNotFoundError
+):
+    return JSONResponse(
+        status_code= 404,
+        content= {
+            "message": "user not found baby!!!",
+            "url": request.url.path
+        }
+    )
+
+import logging
+logging.basicConfig(
+    level= logging.INFO,
+    format= "%(asctime)s - %(levelname)s - %(message)s",
+)
+logger= logging.getLogger(__name__)
+
+@app.get("/ex/get/{id}")
+def get_ex(id: int, db: dbSession):
+    user= db.get(User, id)
+
+    if not user:
+        raise UserNotFoundError()
+
+    return user
+    
+
+
+
 
 @app.post("/register", response_model= UserResponse)
 def register(
@@ -78,17 +115,21 @@ def login(
     stmt= select(User).where(
         User.username== form_data.username
     )
+    logger.info("login attempt recieved")
     existing_user= db.scalar(stmt)
     if not existing_user:
+        logger.warning("login failed")
         raise HTTPException(
-            status_code= status.HTTP_404_NOT_FOUND,
-            detail= "the user is not found"
-        )
-
+                    status_code= status.HTTP_404_NOT_FOUND,
+                    detail= "the user is not found"
+                )
+        
+               
     if not verify_password(
         form_data.password,
         existing_user.password_hash
     ):
+        logger.error("operation failed")
         raise HTTPException(
             status_code= status.HTTP_409_CONFLICT,
             detail= "password incorrect"
@@ -227,10 +268,6 @@ def admin_only(
         "message": "you are an admin"
     }
 
-
-    
-
-    
 
 
     
